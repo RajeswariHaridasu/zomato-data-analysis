@@ -1,171 +1,149 @@
-{
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "# Zomato Bengaluru Restaurant Analysis\n",
-        "\n",
-        "End-to-end exploratory data analysis using **Python and Pandas**. The project examines restaurant ratings, votes, online ordering, table booking, restaurant types, cuisines, locations, and approximate cost for two people."
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "import pandas as pd\n",
-        "import numpy as np\n",
-        "import matplotlib.pyplot as plt\n",
-        "\n",
-        "df = pd.read_csv('../data/zomato_sample.csv')\n",
-        "df.head()"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "## Data Quality Checks"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "df.info()\n",
-        "df.isna().sum().sort_values(ascending=False).head(10)"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "## Cleaning"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "# Clean rating values such as '4.1/5' and 'NEW'\n",
-        "df['rating'] = pd.to_numeric(df['rate'].astype(str).str.extract(r'(\\\\d+(?:\\\\.\\\\d+)?)')[0], errors='coerce')\n",
-        "\n",
-        "# Convert votes and cost to numeric\n",
-        "df['votes'] = pd.to_numeric(df['votes'], errors='coerce')\n",
-        "df['cost_for_two'] = pd.to_numeric(\n",
-        "    df['approx_cost(for two people)'].astype(str).str.replace(',', '', regex=False),\n",
-        "    errors='coerce'\n",
-        ")\n",
-        "\n",
-        "df = df.drop_duplicates(subset=['name', 'location', 'cuisines'])\n",
-        "df[['name','rating','votes','cost_for_two']].head()"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "## Key Business Questions"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "# Top locations by restaurant count\n",
-        "location_summary = df.groupby('location').size().sort_values(ascending=False).head(10)\n",
-        "location_summary"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "# Restaurant types with the highest average rating\n",
-        "type_summary = (df.dropna(subset=['rating'])\n",
-        "                .groupby('rest_type')\n",
-        "                .agg(restaurant_count=('name','count'), avg_rating=('rating','mean'))\n",
-        "                .sort_values('avg_rating', ascending=False)\n",
-        "                .head(10))\n",
-        "type_summary"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "# Online-order adoption\n",
-        "online_order_summary = df['online_order'].value_counts(dropna=False)\n",
-        "online_order_summary"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "## Visualization"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "location_summary.sort_values().plot(kind='barh', figsize=(8,5), title='Top Locations by Restaurant Count')\n",
-        "plt.xlabel('Restaurant Count')\n",
-        "plt.tight_layout()\n",
-        "plt.show()"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
-        "df.dropna(subset=['rating']).plot.scatter(x='rating', y='votes', alpha=0.35, figsize=(8,5), title='Rating vs Votes')\n",
-        "plt.tight_layout()\n",
-        "plt.show()"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
-        "## Key Takeaways\n",
-        "- Identify locations with the highest restaurant concentration.\n",
-        "- Compare restaurant types by average rating and review volume.\n",
-        "- Measure online-order and table-booking adoption.\n",
-        "- Explore the relationship between ratings, votes, and approximate customer spend.\n",
-        "\n",
-        "> Note: The GitHub repository intentionally contains a compact public sample rather than the full source workbook."
-      ]
-    }
-  ],
-  "metadata": {
-    "kernelspec": {
-      "display_name": "Python 3",
-      "language": "python",
-      "name": "python3"
-    },
-    "language_info": {
-      "name": "python",
-      "version": "3.x"
-    }
-  },
-  "nbformat": 4,
-  "nbformat_minor": 5
-}
+"""
+Zomato Bengaluru Restaurant Analysis
+
+Converted notebook to a runnable Python script.
+
+This script performs data loading, basic cleaning, summary tables, and simple visualizations.
+Adjust the input path if your dataset is located elsewhere.
+"""
+
+import re
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+# Input CSV (relative to this script)
+DATA_PATH = os.path.join('..', 'data', 'zomato_sample.csv')
+
+
+def load_data(path=DATA_PATH):
+    """Load the Zomato sample CSV into a DataFrame."""
+    df = pd.read_csv(path)
+    return df
+
+
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean and normalize columns used in analysis.
+
+    - Extract numeric rating from 'rate' (handles values like '4.1/5' and 'NEW').
+    - Convert 'votes' and 'approx_cost(for two people)' to numeric.
+    - Drop duplicates on (name, location, cuisines).
+    """
+    # rating: extract leading numeric part (e.g. '4.1/5' -> 4.1). Non-numeric become NaN.
+    df = df.copy()
+    df['rating'] = pd.to_numeric(
+        df['rate'].astype(str).str.extract(r'(\d+(?:\.\d+)?)')[0], errors='coerce'
+    )
+
+    # votes -> numeric
+    if 'votes' in df.columns:
+        df['votes'] = pd.to_numeric(df['votes'], errors='coerce')
+    else:
+        df['votes'] = np.nan
+
+    # cost for two: remove commas and convert
+    cost_col = 'approx_cost(for two people)'
+    if cost_col in df.columns:
+        df['cost_for_two'] = pd.to_numeric(
+            df[cost_col].astype(str).str.replace(',', '', regex=False), errors='coerce'
+        )
+    else:
+        df['cost_for_two'] = np.nan
+
+    # Drop exact duplicates by name/location/cuisines when present
+    dedup_cols = [c for c in ['name', 'location', 'cuisines'] if c in df.columns]
+    if dedup_cols:
+        df = df.drop_duplicates(subset=dedup_cols)
+
+    return df
+
+
+def summarize_top_locations(df: pd.DataFrame, top_n: int = 10) -> pd.Series:
+    """Return top locations by restaurant count."""
+    if 'location' not in df.columns:
+        return pd.Series(dtype=int)
+    return df.groupby('location').size().sort_values(ascending=False).head(top_n)
+
+
+def summarize_rest_types(df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
+    """Return restaurant types with counts and average rating."""
+    if 'rest_type' not in df.columns:
+        return pd.DataFrame()
+    return (
+        df.dropna(subset=['rating'])
+        .groupby('rest_type')
+        .agg(restaurant_count=('name', 'count'), avg_rating=('rating', 'mean'))
+        .sort_values('avg_rating', ascending=False)
+        .head(top_n)
+    )
+
+
+def online_order_adoption(df: pd.DataFrame) -> pd.Series:
+    """Count values for online ordering adoption (yes/no/NaN)."""
+    if 'online_order' not in df.columns:
+        return pd.Series(dtype=int)
+    return df['online_order'].value_counts(dropna=False)
+
+
+def plot_top_locations(location_summary: pd.Series, outpath: str = 'top_locations.png') -> None:
+    if location_summary.empty:
+        print('No location data to plot.')
+        return
+    ax = location_summary.sort_values().plot(
+        kind='barh', figsize=(8, 5), title='Top Locations by Restaurant Count'
+    )
+    ax.set_xlabel('Restaurant Count')
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+    print(f'Wrote plot: {outpath}')
+
+
+def plot_rating_vs_votes(df: pd.DataFrame, outpath: str = 'rating_vs_votes.png') -> None:
+    if 'rating' not in df.columns or 'votes' not in df.columns:
+        print('Missing rating or votes column for scatter plot.')
+        return
+    sub = df.dropna(subset=['rating'])
+    if sub.empty:
+        print('No rating data available to plot.')
+        return
+    ax = sub.plot.scatter(x='rating', y='votes', alpha=0.35, figsize=(8, 5), title='Rating vs Votes')
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+    print(f'Wrote plot: {outpath}')
+
+
+def main():
+    # Load
+    try:
+        df = load_data()
+    except FileNotFoundError:
+        print(f"Data file not found: {DATA_PATH}. Update DATA_PATH and try again.")
+        return
+
+    print('Loaded rows:', len(df))
+
+    # Clean
+    df = clean_data(df)
+
+    # Summaries
+    loc_summary = summarize_top_locations(df)
+    print('\nTop locations by restaurant count:\n', loc_summary)
+
+    type_summary = summarize_rest_types(df)
+    print('\nTop restaurant types by average rating:\n', type_summary)
+
+    online_summary = online_order_adoption(df)
+    print('\nOnline-order adoption:\n', online_summary)
+
+    # Visualizations (saved to files)
+    plot_top_locations(loc_summary)
+    plot_rating_vs_votes(df)
+
+    print('\nDone.')
+
+
+if __name__ == '__main__':
+    main()
