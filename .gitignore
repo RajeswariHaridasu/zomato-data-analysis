@@ -1,0 +1,11 @@
+# Power BI / large source files
+*.pbix
+*.xlsx
+
+# Python
+__pycache__/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
